@@ -8,20 +8,9 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class BookingService
 {
-    private const PERIODS = [
-        1 => ['start' => '07:50', 'end' => '08:35'],
-        2 => ['start' => '08:35', 'end' => '09:20'],
-        3 => ['start' => '09:40', 'end' => '10:25'],
-        4 => ['start' => '10:30', 'end' => '11:15'],
-        5 => ['start' => '11:20', 'end' => '12:05'],
-        6 => ['start' => '12:10', 'end' => '12:55'],
-    ];
-
-    private const MAX_STUDENTS_PER_PERIOD = 5;
-    private const BOOKING_ADVANCE_MINUTES = 60;
-
     public function __construct(
-        private EntityManagerInterface $entityManager
+        private EntityManagerInterface $entityManager,
+        private ConfigService $configService
     ) {
     }
 
@@ -43,8 +32,10 @@ class BookingService
         
         return [
             'days' => $weekDays,
-            'periods' => self::PERIODS,
+            'periods' => $this->configService->getPeriods(),
             'start_date' => $monday,
+            'fixed_offers' => $this->configService->getFixedOffers(),
+            'free_modules' => $this->configService->getFreeModules(),
         ];
     }
 
@@ -99,14 +90,18 @@ class BookingService
             throw new \Exception('Wochenenden können nicht gebucht werden.');
         }
         
+        $periods = $this->configService->getPeriods();
+        $bookingAdvanceMinutes = $this->configService->getBookingAdvanceMinutes();
+        $maxStudents = $this->configService->getMaxStudentsPerPeriod();
+        
         $now = new \DateTime();
         $periodStart = clone $date;
-        $periodStartTime = self::PERIODS[$period]['start'];
+        $periodStartTime = $periods[$period]['start'];
         $periodStart->setTime(...explode(':', $periodStartTime));
         
         $diffMinutes = ($periodStart->getTimestamp() - $now->getTimestamp()) / 60;
-        if ($diffMinutes < self::BOOKING_ADVANCE_MINUTES) {
-            throw new \Exception('Buchungen müssen mindestens ' . self::BOOKING_ADVANCE_MINUTES . ' Minuten im Voraus erfolgen.');
+        if ($diffMinutes < $bookingAdvanceMinutes) {
+            throw new \Exception('Buchungen müssen mindestens ' . $bookingAdvanceMinutes . ' Minuten im Voraus erfolgen.');
         }
         
         $existing = $this->entityManager
@@ -118,8 +113,8 @@ class BookingService
         }
         
         $students = json_decode($data['students_json'], true) ?? [];
-        if (count($students) > self::MAX_STUDENTS_PER_PERIOD) {
-            throw new \Exception('Maximale Anzahl von Schülern überschritten (' . self::MAX_STUDENTS_PER_PERIOD . ').');
+        if (count($students) > $maxStudents) {
+            throw new \Exception('Maximale Anzahl von Schülern überschritten (' . $maxStudents . ').');
         }
         
         $studentNames = array_column($students, 'name');

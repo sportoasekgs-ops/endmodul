@@ -9,6 +9,7 @@ use SportOase\Entity\User;
 use SportOase\Service\BookingService;
 use SportOase\Service\ExportService;
 use SportOase\Service\AuditService;
+use SportOase\Service\ConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,7 +26,8 @@ class AdminController extends AbstractController
         private EntityManagerInterface $entityManager,
         private BookingService $bookingService,
         private ExportService $exportService,
-        private AuditService $auditService
+        private AuditService $auditService,
+        private ConfigService $configService
     ) {
     }
 
@@ -407,5 +409,123 @@ class AdminController extends AbstractController
         ));
         
         return $response;
+    }
+
+    #[Route('/settings', name: 'sportoase_admin_settings', methods: ['GET', 'POST'])]
+    public function settings(Request $request): Response
+    {
+        if ($request->isMethod('POST')) {
+            $action = $request->request->get('action');
+            
+            if ($action === 'update_periods') {
+                if (!$this->isCsrfTokenValid('settings-periods', $request->request->get('_token'))) {
+                    $this->addFlash('error', 'Ungültiges CSRF-Token');
+                    return $this->redirectToRoute('sportoase_admin_settings');
+                }
+                
+                try {
+                    $periods = [];
+                    for ($i = 1; $i <= 6; $i++) {
+                        $start = $request->request->get('period_' . $i . '_start');
+                        $end = $request->request->get('period_' . $i . '_end');
+                        
+                        if (!preg_match('/^\d{2}:\d{2}$/', $start) || !preg_match('/^\d{2}:\d{2}$/', $end)) {
+                            throw new \Exception('Ungültiges Zeitformat');
+                        }
+                        
+                        $periods[$i] = ['start' => $start, 'end' => $end];
+                    }
+                    $this->configService->set('periods', $periods);
+                    $this->addFlash('success', 'Stundenzeiten erfolgreich aktualisiert!');
+                } catch (\Exception $e) {
+                    $this->addFlash('error', 'Fehler beim Speichern: ' . $e->getMessage());
+                }
+            } elseif ($action === 'update_fixed_offers') {
+                if (!$this->isCsrfTokenValid('settings-offers', $request->request->get('_token'))) {
+                    $this->addFlash('error', 'Ungültiges CSRF-Token');
+                    return $this->redirectToRoute('sportoase_admin_settings');
+                }
+                
+                try {
+                    $fixedOffers = [];
+                    $weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                    
+                    foreach ($weekdays as $weekday) {
+                        $fixedOffers[$weekday] = [];
+                        for ($period = 1; $period <= 6; $period++) {
+                            $offerKey = 'offer_' . $weekday . '_' . $period;
+                            $offer = trim($request->request->get($offerKey));
+                            if (!empty($offer) && strlen($offer) <= 255) {
+                                $fixedOffers[$weekday][$period] = htmlspecialchars($offer, ENT_QUOTES, 'UTF-8');
+                            }
+                        }
+                    }
+                    
+                    $this->configService->set('fixed_offers', $fixedOffers);
+                    $this->addFlash('success', 'Feste Angebote erfolgreich aktualisiert!');
+                } catch (\Exception $e) {
+                    $this->addFlash('error', 'Fehler beim Speichern: ' . $e->getMessage());
+                }
+            } elseif ($action === 'update_free_modules') {
+                if (!$this->isCsrfTokenValid('settings-modules', $request->request->get('_token'))) {
+                    $this->addFlash('error', 'Ungültiges CSRF-Token');
+                    return $this->redirectToRoute('sportoase_admin_settings');
+                }
+                
+                try {
+                    $modulesStr = $request->request->get('free_modules');
+                    $modules = array_filter(array_map('trim', explode("\n", $modulesStr)));
+                    $modules = array_map(function($m) {
+                        return strlen($m) <= 255 ? htmlspecialchars($m, ENT_QUOTES, 'UTF-8') : '';
+                    }, $modules);
+                    $modules = array_filter($modules);
+                    
+                    if (empty($modules)) {
+                        throw new \Exception('Mindestens ein Modul erforderlich');
+                    }
+                    
+                    $this->configService->set('free_modules', array_values($modules));
+                    $this->addFlash('success', 'Module für freie Stunden erfolgreich aktualisiert!');
+                } catch (\Exception $e) {
+                    $this->addFlash('error', 'Fehler beim Speichern: ' . $e->getMessage());
+                }
+            } elseif ($action === 'update_system_settings') {
+                if (!$this->isCsrfTokenValid('settings-system', $request->request->get('_token'))) {
+                    $this->addFlash('error', 'Ungültiges CSRF-Token');
+                    return $this->redirectToRoute('sportoase_admin_settings');
+                }
+                
+                try {
+                    $maxStudents = (int) $request->request->get('max_students_per_period');
+                    $advanceMinutes = (int) $request->request->get('booking_advance_minutes');
+                    
+                    if ($maxStudents < 1 || $maxStudents > 20) {
+                        throw new \Exception('Schüleranzahl muss zwischen 1 und 20 liegen');
+                    }
+                    
+                    if ($advanceMinutes < 0 || $advanceMinutes > 1440) {
+                        throw new \Exception('Vorlaufzeit muss zwischen 0 und 1440 Minuten liegen');
+                    }
+                    
+                    $settings = [
+                        'max_students_per_period' => $maxStudents,
+                        'booking_advance_minutes' => $advanceMinutes,
+                    ];
+                    $this->configService->set('system_settings', $settings);
+                    $this->addFlash('success', 'Systemeinstellungen erfolgreich aktualisiert!');
+                } catch (\Exception $e) {
+                    $this->addFlash('error', 'Fehler beim Speichern: ' . $e->getMessage());
+                }
+            }
+            
+            return $this->redirectToRoute('sportoase_admin_settings');
+        }
+        
+        return $this->render('@SportOase/admin/settings.html.twig', [
+            'periods' => $this->configService->getPeriods(),
+            'fixed_offers' => $this->configService->getFixedOffers(),
+            'free_modules' => $this->configService->getFreeModules(),
+            'system_settings' => $this->configService->getSystemSettings(),
+        ]);
     }
 }

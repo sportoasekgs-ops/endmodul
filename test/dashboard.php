@@ -87,8 +87,8 @@ $bookingsStmt = $db->prepare("
     SELECT b.*, u.username as teacher_username
     FROM sportoase_bookings b
     JOIN sportoase_users u ON b.user_id = u.id
-    WHERE b.booking_date BETWEEN ? AND ?
-    ORDER BY b.booking_date, b.period
+    WHERE b.date BETWEEN ? AND ?
+    ORDER BY b.date, b.period
 ");
 $bookingsStmt->execute([$weekStart, $weekEnd]);
 $bookings = $bookingsStmt->fetchAll();
@@ -96,7 +96,7 @@ $bookings = $bookingsStmt->fetchAll();
 // Get blocked slots
 $blockedStmt = $db->prepare("
     SELECT * FROM sportoase_blocked_slots
-    WHERE slot_date BETWEEN ? AND ?
+    WHERE date BETWEEN ? AND ?
 ");
 $blockedStmt->execute([$weekStart, $weekEnd]);
 $blockedSlots = $blockedStmt->fetchAll();
@@ -104,13 +104,13 @@ $blockedSlots = $blockedStmt->fetchAll();
 // Build matrices
 $schedule = [];
 foreach ($bookings as $booking) {
-    $key = $booking['booking_date'] . '_' . $booking['period'];
+    $key = $booking['date'] . '_' . $booking['period'];
     $schedule[$key] = $booking;
 }
 
 $blocked = [];
 foreach ($blockedSlots as $slot) {
-    $key = $slot['slot_date'] . '_' . $slot['period'];
+    $key = $slot['date'] . '_' . $slot['period'];
     $blocked[$key] = $slot;
 }
 
@@ -119,9 +119,9 @@ $periods = [
     1 => '07:50 - 08:35',
     2 => '08:35 - 09:20',
     3 => '09:40 - 10:25',
-    4 => '10:30 - 11:15',
-    5 => '11:20 - 12:05',
-    6 => '12:10 - 12:55'
+    4 => '10:25 - 11:20',
+    5 => '11:40 - 12:25',
+    6 => '12:25 - 13:10'
 ];
 ?>
 <!DOCTYPE html>
