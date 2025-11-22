@@ -17,15 +17,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "SportOase Test"
+args = "SportOase Test Environment"
 
 [[workflows.workflow]]
-name = "SportOase Test"
+name = "SportOase Test Environment"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "php -S 0.0.0.0:5000 -t ."
+args = "php -S 0.0.0.0:5000 -t test"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -36,7 +36,7 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 37409
+localPort = 35407
 externalPort = 3001
 
 [[ports]]

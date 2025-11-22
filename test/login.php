@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
-            header('Location: /test/');
+            header('Location: dashboard.php');
             exit;
         } else {
             $error = 'Ungültiger Benutzername oder Passwort';
@@ -31,13 +31,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SportOase - Login (Test)</title>
-    <link href="/public/build/app.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
     <div class="max-w-md w-full mx-4">
         <div class="bg-white rounded-2xl shadow-xl p-8">
             <div class="text-center mb-8">
-                <img src="/public/assets/icon-192.png" alt="SportOase" class="w-24 h-24 mx-auto mb-4 rounded-xl shadow-lg">
+                <div class="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg flex items-center justify-center text-4xl text-white">
+                    🏃
+                </div>
                 <h1 class="text-3xl font-bold text-gray-800 mb-2">SportOase</h1>
                 <p class="text-gray-600">Test-Umgebung</p>
             </div>
