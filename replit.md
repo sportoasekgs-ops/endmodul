@@ -12,6 +12,7 @@ SportOase is a **PHP/Symfony-based IServ module** for booking school sports faci
 - Complete conversion from Flask/Python to PHP/Symfony IServ module structure
 - Implemented Phase 2 enhanced features (slot management, user management, audit trail, search/filter, statistics)
 - Implemented Phase 3 features (Google Calendar service, CSV/PDF export, PWA support)
+- **NEW: Implemented moveable fixed course offerings** - Admins can position fixed courses anywhere in the weekly schedule and enforce that teachers can only book the specific module assigned to each slot
 - Created comprehensive implementation documentation (PHASE2_PHASE3_IMPLEMENTATION.md)
 
 ## User Preferences
@@ -71,6 +72,8 @@ Using Doctrine ORM with PostgreSQL:
 - **sportoase_blocked_slots** - Admin-managed blocked time slots with reasons
 - **sportoase_notifications** - Notification history for admins
 - **sportoase_audit_logs** - Audit trail for all changes (entity_type, entity_id, action, user, changes, IP)
+- **sportoase_fixed_offer_placements** - Admin-positioned fixed course offerings (weekday, period, offer_name) with UNIQUE constraint
+- **sportoase_fixed_offer_names** - Custom display names for fixed offers (offer_key -> custom_name mapping)
 
 ### Authentication & Authorization
 
@@ -93,6 +96,7 @@ Using Doctrine ORM with PostgreSQL:
    - `/statistics` - Usage statistics dashboard with charts
    - `/export/csv` - Export bookings to CSV
    - `/export/pdf` - Export bookings to PDF/HTML
+   - `/courses/manage` - Manage fixed course placements and custom names (moveable courses)
 
 All routes defined in `config/routes.yaml` and registered via `manifest.xml`.
 

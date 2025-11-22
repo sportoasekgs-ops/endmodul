@@ -62,6 +62,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($offer, FREE_MODULES)) {
                 $error = 'Ungültiges Modul. Bitte wählen Sie ein Modul aus der Liste.';
             } else {
+                // Get booking to check fixed offer restriction (admins can override, but validate anyway)
+                $stmt = $db->prepare("SELECT booking_date, period FROM sportoase_bookings WHERE id = ?");
+                $stmt->execute([$id]);
+                $booking = $stmt->fetch();
+                
+                // Note: Admins can edit to any module, but we log a warning if they change a fixed offer
+                if ($booking && ($fixedOfferKey = getFixedOfferKey($booking['booking_date'], $booking['period']))) {
+                    if ($offer !== $fixedOfferKey) {
+                        // Admin override - allow but could log this
+                        // For now, we allow it for admin flexibility
+                    }
+                }
+                
                 try {
                     $stmt = $db->prepare("UPDATE sportoase_bookings SET offer_details = ?, students_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([
@@ -145,6 +158,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     }
+    
+    // Move/Add fixed offer placement
+    if ($action === 'save_fixed_offer_placement') {
+        $weekday = (int)($_POST['weekday'] ?? 0);
+        $period = (int)($_POST['period'] ?? 0);
+        $offerName = $_POST['offer_name'] ?? '';
+        
+        if ($weekday >= 1 && $weekday <= 5 && $period >= 1 && $period <= 6 && $offerName) {
+            // Validate offer_name is in FREE_MODULES
+            if (!in_array($offerName, FREE_MODULES)) {
+                $error = 'Ungültiges Modul ausgewählt.';
+            } else {
+                try {
+                    $stmt = $db->prepare("
+                        INSERT INTO sportoase_fixed_offer_placements (weekday, period, offer_name)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT (weekday, period) DO UPDATE SET offer_name = EXCLUDED.offer_name
+                    ");
+                    $stmt->execute([$weekday, $period, $offerName]);
+                    header('Location: admin.php?tab=manage_fixed_offers&success=placement_saved');
+                    exit;
+                } catch (PDOException $e) {
+                    $error = 'Fehler beim Speichern: ' . $e->getMessage();
+                }
+            }
+        }
+    }
+    
+    // Delete fixed offer placement
+    if ($action === 'delete_fixed_offer_placement') {
+        $weekday = (int)($_POST['weekday'] ?? 0);
+        $period = (int)($_POST['period'] ?? 0);
+        
+        if ($weekday && $period) {
+            $stmt = $db->prepare("DELETE FROM sportoase_fixed_offer_placements WHERE weekday = ? AND period = ?");
+            $stmt->execute([$weekday, $period]);
+            header('Location: admin.php?tab=manage_fixed_offers&success=placement_deleted');
+            exit;
+        }
+    }
 }
 
 // Get statistics
@@ -193,6 +246,27 @@ $fixedOfferNames = $db->query("
     SELECT * FROM sportoase_fixed_offer_names
     ORDER BY offer_key
 ")->fetchAll();
+
+// Get all fixed offer placements
+$fixedOfferPlacements = $db->query("
+    SELECT * FROM sportoase_fixed_offer_placements
+    ORDER BY weekday, period
+")->fetchAll();
+
+// Group placements by weekday for easier display
+$placementsByWeekday = [];
+foreach ($fixedOfferPlacements as $placement) {
+    $placementsByWeekday[$placement['weekday']][$placement['period']] = $placement['offer_name'];
+}
+
+// Weekday names
+$weekdayNames = [
+    1 => 'Montag',
+    2 => 'Dienstag',
+    3 => 'Mittwoch',
+    4 => 'Donnerstag',
+    5 => 'Freitag'
+];
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -274,6 +348,9 @@ $fixedOfferNames = $db->query("
                     </button>
                     <button onclick="showTab('fixed_offers')" id="tab-fixed_offers" class="tab-btn border-b-2 border-transparent px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
                         Feste Angebote
+                    </button>
+                    <button onclick="showTab('manage_fixed_offers')" id="tab-manage_fixed_offers" class="tab-btn border-b-2 border-transparent px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Kurse verschieben
                     </button>
                 </nav>
             </div>
@@ -561,6 +638,116 @@ $fixedOfferNames = $db->query("
                             </form>
                         </div>
                     <?php endforeach; ?>
+                </div>
+            </div>
+            
+            <!-- Manage Fixed Offers Tab -->
+            <div id="content-manage_fixed_offers" class="tab-content hidden p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Feste Kurse verschieben</h3>
+                <p class="text-sm text-gray-600 mb-6">
+                    Hier können Sie festlegen, an welchem Wochentag und in welcher Stunde welches feste Angebot angezeigt wird.
+                    <strong>Diese Kurse werden gelb im Wochenplan markiert.</strong> Lehrer können beim Klick auf ein festes Angebot nur dieses Modul buchen.
+                </p>
+                
+                <!-- Current Placements Overview -->
+                <div class="mb-8">
+                    <h4 class="text-md font-bold text-gray-700 mb-4">Aktuelle Wochenplan-Übersicht</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-700">Stunde</th>
+                                    <?php foreach ($weekdayNames as $weekday => $dayName): ?>
+                                        <th class="border border-gray-300 px-4 py-2 text-center text-sm font-medium text-gray-700"><?= $dayName ?></th>
+                                    <?php endforeach; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php for ($period = 1; $period <= 6; $period++): ?>
+                                    <tr>
+                                        <td class="border border-gray-300 px-4 py-2 text-sm font-medium bg-gray-50">
+                                            <?= $period ?>. Stunde<br>
+                                            <span class="text-xs text-gray-500"><?= PERIOD_TIMES[$period] ?></span>
+                                        </td>
+                                        <?php foreach ($weekdayNames as $weekday => $dayName): ?>
+                                            <td class="border border-gray-300 px-4 py-2 text-center">
+                                                <?php if (isset($placementsByWeekday[$weekday][$period])): ?>
+                                                    <div class="bg-yellow-100 border border-yellow-300 rounded-lg px-3 py-2">
+                                                        <div class="text-sm font-semibold text-gray-800">
+                                                            <?= htmlspecialchars($placementsByWeekday[$weekday][$period]) ?>
+                                                        </div>
+                                                        <form method="POST" class="mt-2">
+                                                            <input type="hidden" name="action" value="delete_fixed_offer_placement">
+                                                            <input type="hidden" name="weekday" value="<?= $weekday ?>">
+                                                            <input type="hidden" name="period" value="<?= $period ?>">
+                                                            <button type="submit" class="text-xs text-red-600 hover:text-red-800 font-medium">
+                                                                🗑️ Entfernen
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <span class="text-xs text-gray-400">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                <?php endfor; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Add/Move Fixed Offer -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <h4 class="text-md font-bold text-gray-800 mb-4">Festen Kurs hinzufügen oder verschieben</h4>
+                    <form method="POST" class="space-y-4">
+                        <input type="hidden" name="action" value="save_fixed_offer_placement">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Wochentag *</label>
+                                <select name="weekday" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="">-- Wählen --</option>
+                                    <?php foreach ($weekdayNames as $weekday => $dayName): ?>
+                                        <option value="<?= $weekday ?>"><?= $dayName ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Stunde (Periode) *</label>
+                                <select name="period" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="">-- Wählen --</option>
+                                    <?php for ($p = 1; $p <= 6; $p++): ?>
+                                        <option value="<?= $p ?>"><?= $p ?>. Stunde (<?= PERIOD_TIMES[$p] ?>)</option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Festes Angebot *</label>
+                                <select name="offer_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="">-- Wählen --</option>
+                                    <?php foreach (FREE_MODULES as $module): ?>
+                                        <option value="<?= htmlspecialchars($module) ?>"><?= htmlspecialchars($module) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end">
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg transition">
+                                Festen Kurs platzieren
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                        <p class="text-xs text-gray-700">
+                            <strong>💡 Hinweis:</strong> Wenn Sie einen Kurs in einen Slot verschieben, der bereits einen festen Kurs hat, 
+                            wird der alte Kurs überschrieben. Lehrer können beim Klick auf einen gelben festen Kurs nur dieses Modul buchen.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

@@ -34,7 +34,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Validate slot is bookable (checks: weekend, advance time - NOT fixed offers!)
             elseif (!isSlotBookable($date, $period)) {
                 $error = 'Dieser Slot ist nicht buchbar (Wochenende oder zu kurz vor Beginn).';
-            } else {
+            } 
+            // CRITICAL: If slot has a fixed offer, user MUST book that specific offer (original key)
+            elseif ($fixedOfferKey = getFixedOfferKey($date, $period)) {
+                if ($offer !== $fixedOfferKey) {
+                    $fixedOfferDisplayName = getFixedOfferDisplayName($date, $period);
+                    $error = 'Dieser Slot hat ein festes Angebot (' . htmlspecialchars($fixedOfferDisplayName) . '). Sie können nur dieses Modul buchen.';
+                }
+            }
+            
+            if (!isset($error)) {
                 // Check if slot is blocked by admin
                 $stmt = $db->prepare("SELECT id FROM sportoase_blocked_slots WHERE slot_date = ? AND period = ?");
                 $stmt->execute([$date, $period]);
@@ -93,27 +102,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($offer, FREE_MODULES)) {
                 $error = 'Ungültiges Modul. Bitte wählen Sie ein Modul aus der Liste.';
             } else {
-                try {
-                    if ($isAdminUser) {
-                        $stmt = $db->prepare("UPDATE sportoase_bookings SET offer_details = ?, students_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                        $stmt->execute([
-                            $offer,
-                            json_encode($students),
-                            $id
-                        ]);
-                    } else {
-                        $stmt = $db->prepare("UPDATE sportoase_bookings SET offer_details = ?, students_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?");
-                        $stmt->execute([
-                            $offer,
-                            json_encode($students),
-                            $id,
-                            $user['id']
-                        ]);
+                // Get booking to check fixed offer restriction
+                $stmt = $db->prepare("SELECT booking_date, period FROM sportoase_bookings WHERE id = ? AND user_id = ?");
+                $stmt->execute([$id, $user['id']]);
+                $booking = $stmt->fetch();
+                
+                if (!$booking && !$isAdminUser) {
+                    $error = 'Buchung nicht gefunden oder keine Berechtigung.';
+                }
+                // CRITICAL: If slot has a fixed offer, user MUST edit to that specific offer only
+                elseif ($booking && ($fixedOfferKey = getFixedOfferKey($booking['booking_date'], $booking['period']))) {
+                    if ($offer !== $fixedOfferKey) {
+                        $fixedOfferDisplayName = getFixedOfferDisplayName($booking['booking_date'], $booking['period']);
+                        $error = 'Dieser Slot hat ein festes Angebot (' . htmlspecialchars($fixedOfferDisplayName) . '). Sie können nur dieses Modul bearbeiten.';
                     }
-                    header('Location: dashboard.php?success=booking_updated');
-                    exit;
-                } catch (PDOException $e) {
-                    $error = 'Fehler beim Aktualisieren der Buchung: ' . $e->getMessage();
+                }
+                
+                if (!isset($error)) {
+                    try {
+                        if ($isAdminUser) {
+                            $stmt = $db->prepare("UPDATE sportoase_bookings SET offer_details = ?, students_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                            $stmt->execute([
+                                $offer,
+                                json_encode($students),
+                                $id
+                            ]);
+                        } else {
+                            $stmt = $db->prepare("UPDATE sportoase_bookings SET offer_details = ?, students_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?");
+                            $stmt->execute([
+                                $offer,
+                                json_encode($students),
+                                $id,
+                                $user['id']
+                            ]);
+                        }
+                        header('Location: dashboard.php?success=booking_updated');
+                        exit;
+                    } catch (PDOException $e) {
+                        $error = 'Fehler beim Aktualisieren der Buchung: ' . $e->getMessage();
+                    }
                 }
             }
         }
@@ -290,8 +317,9 @@ $periods = PERIOD_TIMES;
                                     // Get data for this slot
                                     $booking = $schedule[$key] ?? null;
                                     $isBlocked = isset($blocked[$key]);
-                                    $fixedOffer = getFixedOffer($dateStr, $periodNum);
-                                    $hasFixedOffer = $fixedOffer !== null;
+                                    $fixedOfferKey = getFixedOfferKey($dateStr, $periodNum);
+                                    $fixedOfferDisplay = getFixedOfferDisplayName($dateStr, $periodNum);
+                                    $hasFixedOffer = $fixedOfferKey !== null;
                                     
                                     // Calculate bookability: NOT blocked AND passes time/weekend checks
                                     $bookable = !$isBlocked && isSlotBookable($dateStr, $periodNum);
@@ -339,13 +367,13 @@ $periods = PERIOD_TIMES;
                                                 <?php endif; ?>
                                             </div>
                                         <?php elseif ($bookable && $hasFixedOffer): ?>
-                                            <!-- Slot mit festem Angebot - ABER BUCHBAR! -->
+                                            <!-- Slot mit festem Angebot - BUCHBAR mit vorausgewähltem Modul! -->
                                             <button 
-                                                onclick="openBookingModal('<?= $dateStr ?>', <?= $periodNum ?>)"
+                                                onclick="openBookingModal('<?= $dateStr ?>', <?= $periodNum ?>, '<?= htmlspecialchars($fixedOfferKey, ENT_QUOTES) ?>')"
                                                 class="w-full bg-yellow-50 hover:bg-yellow-100 border border-yellow-300 rounded-lg p-3 text-sm transition"
                                             >
-                                                <div class="font-semibold text-yellow-800">⭐ <?= htmlspecialchars($fixedOffer) ?></div>
-                                                <div class="text-xs text-yellow-700 mt-1">+ Überschreiben / Buchen</div>
+                                                <div class="font-semibold text-yellow-800">⭐ <?= htmlspecialchars($fixedOfferDisplay) ?></div>
+                                                <div class="text-xs text-yellow-700 mt-1">+ Buchen</div>
                                             </button>
                                         <?php elseif ($bookable): ?>
                                             <!-- Freier Slot - buchbar -->
@@ -382,12 +410,15 @@ $periods = PERIOD_TIMES;
                 
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Modul / Aktivität *</label>
-                    <select name="offer" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <select name="offer" id="modal_offer" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         <option value="">-- Modul wählen --</option>
                         <?php foreach (FREE_MODULES as $module): ?>
                             <option value="<?= htmlspecialchars($module) ?>"><?= htmlspecialchars($module) ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <p id="fixed_offer_notice" class="hidden mt-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-300 rounded px-3 py-2">
+                        ℹ️ <strong>Festes Angebot:</strong> Beim Klick auf ein festes Angebot können Sie nur dieses Modul buchen.
+                    </p>
                 </div>
                 
                 <div class="mb-6">
@@ -458,9 +489,41 @@ $periods = PERIOD_TIMES;
     </div>
 
     <script>
-        function openBookingModal(date, period) {
+        function openBookingModal(date, period, fixedOffer = null) {
             document.getElementById('modal_date').value = date;
             document.getElementById('modal_period').value = period;
+            
+            const offerSelect = document.getElementById('modal_offer');
+            const fixedOfferNotice = document.getElementById('fixed_offer_notice');
+            
+            // Remove any existing hidden field for fixed offer
+            const existingHidden = document.getElementById('fixed_offer_hidden');
+            if (existingHidden) {
+                existingHidden.remove();
+            }
+            
+            // If fixed offer is provided, pre-select it and make it readonly
+            if (fixedOffer) {
+                offerSelect.value = fixedOffer;
+                offerSelect.disabled = true;
+                offerSelect.classList.add('bg-yellow-50', 'border-yellow-300', 'cursor-not-allowed');
+                fixedOfferNotice.classList.remove('hidden');
+                
+                // Add hidden field to ensure value is submitted even when select is disabled
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'offer';
+                hiddenInput.value = fixedOffer;
+                hiddenInput.id = 'fixed_offer_hidden';
+                offerSelect.parentNode.appendChild(hiddenInput);
+            } else {
+                // Reset to normal state
+                offerSelect.value = '';
+                offerSelect.disabled = false;
+                offerSelect.classList.remove('bg-yellow-50', 'border-yellow-300', 'cursor-not-allowed');
+                fixedOfferNotice.classList.add('hidden');
+            }
+            
             document.getElementById('bookingModal').classList.remove('hidden');
         }
         

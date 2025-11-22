@@ -77,34 +77,6 @@ define('PERIOD_TIMES', [
     6 => '12:25 - 13:10'
 ]);
 
-// Fixed offers - predefined courses shown in schedule (slots remain bookable)
-// Format: [weekday][period] = 'Offer Name'
-define('FIXED_OFFERS', [
-    1 => [ // Monday
-        1 => 'Wochenstart Warm-Up',
-        3 => 'Aktivierung',
-        5 => 'Regulation / Entspannung'
-    ],
-    2 => [ // Tuesday
-        2 => 'Aktivierung',
-        4 => 'Konflikt-Reset'
-    ],
-    3 => [ // Wednesday
-        1 => 'Aktivierung',
-        3 => 'Regulation / Entspannung',
-        5 => 'Turnen / flexibel'
-    ],
-    4 => [ // Thursday
-        2 => 'Konflikt-Reset',
-        5 => 'Aktivierung'
-    ],
-    5 => [ // Friday
-        2 => 'Regulation / Entspannung',
-        4 => 'Turnen / flexibel',
-        5 => 'Wochenstart Warm-Up'
-    ]
-]);
-
 // All available modules for booking (including fixed offers)
 define('FREE_MODULES', [
     'Aktivierung',
@@ -113,6 +85,22 @@ define('FREE_MODULES', [
     'Turnen / flexibel',
     'Wochenstart Warm-Up'
 ]);
+
+// Get all fixed offer placements from database (cached)
+function getFixedOfferPlacements() {
+    static $placements = null;
+    
+    if ($placements === null) {
+        $db = getDb();
+        $stmt = $db->query("SELECT weekday, period, offer_name FROM sportoase_fixed_offer_placements ORDER BY weekday, period");
+        $placements = [];
+        while ($row = $stmt->fetch()) {
+            $placements[$row['weekday']][$row['period']] = $row['offer_name'];
+        }
+    }
+    
+    return $placements;
+}
 
 // Maximum students per period
 define('MAX_STUDENTS_PER_PERIOD', 5);
@@ -136,11 +124,16 @@ function getOfferCustomName($offerKey) {
     return $customNames[$offerKey] ?? $offerKey;
 }
 
-// Get fixed offer name for a slot (if exists) - returns custom name if set
-function getFixedOffer($date, $period) {
+// Get fixed offer KEY (original name) for a slot - for validation/comparison
+function getFixedOfferKey($date, $period) {
     $dayOfWeek = (int)(new DateTime($date))->format('N'); // 1 = Monday, 7 = Sunday
-    $fixedOffers = FIXED_OFFERS;
-    $offerKey = $fixedOffers[$dayOfWeek][$period] ?? null;
+    $fixedOffers = getFixedOfferPlacements();
+    return $fixedOffers[$dayOfWeek][$period] ?? null;
+}
+
+// Get fixed offer DISPLAY name for a slot (with custom name if set) - for display only
+function getFixedOfferDisplayName($date, $period) {
+    $offerKey = getFixedOfferKey($date, $period);
     
     if ($offerKey === null) {
         return null;
@@ -149,9 +142,14 @@ function getFixedOffer($date, $period) {
     return getOfferCustomName($offerKey);
 }
 
-// Check if a slot has a fixed offer (for display purposes - slot is still bookable!)
+// Deprecated: Use getFixedOfferKey() for validation or getFixedOfferDisplayName() for display
+function getFixedOffer($date, $period) {
+    return getFixedOfferDisplayName($date, $period);
+}
+
+// Check if a slot has a fixed offer
 function hasFixedOffer($date, $period) {
-    return getFixedOffer($date, $period) !== null;
+    return getFixedOfferKey($date, $period) !== null;
 }
 
 // Check if a slot is bookable
