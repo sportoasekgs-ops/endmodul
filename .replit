@@ -17,15 +17,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "SportOase Module Validation"
+args = "Validate Module Structure"
 
 [[workflows.workflow]]
-name = "SportOase Module Validation"
+name = "Validate Module Structure"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "./validate.sh"
+args = "./check_structure.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"

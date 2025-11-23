@@ -37,73 +37,20 @@ SportOase is a **modernized IServ-compatible module** built with Symfony 6.4+ th
 
 ## Installation
 
-### 1. Package Installation
+**📖 See [INSTALLATION.md](INSTALLATION.md) for complete deployment instructions**
 
-As an IServ module, SportOase should be packaged as a Debian package and installed via the IServ package manager:
+Quick overview:
 
-```bash
-# On the IServ server
-aptitude install iserv3-sportoase
-```
+1. Build Debian package: `dpkg-buildpackage -us -uc`
+2. Install on IServ: `aptitude install iserv-sportoase_1.0.0_all.deb`
+3. Configure OAuth2 in IServ admin panel
+4. Edit `/etc/iserv/sportoase.env`
+5. Run migrations: `php bin/console doctrine:migrations:migrate`
+6. Enable module in **System → Modules**
 
-### 2. Database Migration
+## Time Periods
 
-Run the Doctrine migrations to create the database schema:
-
-```bash
-php bin/console doctrine:migrations:migrate --no-interaction
-```
-
-### 3. Enable Module
-
-Enable the module in the IServ admin panel under **System → Modules**.
-
-## Module Structure
-
-```
-sportoase/
-├── composer.json              # PHP dependencies
-├── manifest.xml               # IServ module manifest
-├── src/
-│   ├── SportOaseBundle.php    # Main bundle class
-│   ├── Controller/            # Symfony controllers
-│   │   ├── DashboardController.php
-│   │   ├── BookingController.php
-│   │   └── AdminController.php
-│   ├── Entity/                # Doctrine entities
-│   │   ├── User.php
-│   │   ├── Booking.php
-│   │   ├── SlotName.php
-│   │   ├── BlockedSlot.php
-│   │   └── Notification.php
-│   └── Service/               # Business logic
-│       ├── BookingService.php
-│       └── EmailService.php
-├── migrations/                # Doctrine migrations
-│   └── Version001CreateInitialSchema.php
-├── templates/                 # Twig templates
-│   └── sportoase/
-├── config/
-│   ├── routes.yaml           # Route configuration
-│   └── services.yaml         # Service definitions
-└── README.md
-```
-
-## Configuration
-
-### Module Settings
-
-Configure the module via **IServ Admin → Modules → SportOase**:
-
-- **Max Students per Period** - Maximum students allowed per time slot (default: 5)
-- **Booking Advance Minutes** - Minimum time before slot start for bookings (default: 60)
-- **Enable Email Notifications** - Turn on/off email alerts (default: true)
-- **SMTP Server** - Email server for notifications
-- **SMTP Port** - Email server port (default: 587)
-
-### Time Periods
-
-The module uses 6 fixed time periods per day (customizable in `BookingService.php`):
+The module uses 6 fixed time periods per day:
 
 1. 07:50 - 08:35
 2. 08:35 - 09:20
@@ -111,6 +58,10 @@ The module uses 6 fixed time periods per day (customizable in `BookingService.ph
 4. 10:30 - 11:15
 5. 11:20 - 12:05
 6. 12:10 - 12:55
+
+## Configuration
+
+All configuration is done via `/etc/iserv/sportoase.env` after installation. See **INSTALLATION.md** for detailed setup instructions
 
 ## Usage
 
@@ -129,21 +80,6 @@ The module uses 6 fixed time periods per day (customizable in `BookingService.ph
 3. Edit or delete any booking
 4. Block specific time slots
 5. Manage custom slot names
-
-## Development
-
-### Local Development
-
-```bash
-# Install dependencies
-composer install
-
-# Run migrations
-php bin/console doctrine:migrations:migrate
-
-# Start development server
-symfony serve
-```
 
 ## License
 

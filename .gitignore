@@ -1,12 +1,12 @@
-# Composer
+# Dependencies
 /vendor/
+/node_modules/
 composer.phar
 composer.lock
 
 # Symfony
 /var/
 /public/bundles/
-/public/build/
 .env.local
 .env.local.php
 .env.*.local
@@ -16,7 +16,13 @@ composer.lock
 /phpunit.xml
 
 # Build artifacts
+/public/build/
 /build/
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # IDEs
 /.vscode/
@@ -41,3 +47,9 @@ Thumbs.db
 /debian/*.substvars
 /debian/*.debhelper
 /debian/tmp/
+
+# Replit
+/.local/
+/.cache/
+/.config/
+__pycache__/
