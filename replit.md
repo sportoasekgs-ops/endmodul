@@ -8,12 +8,14 @@ SportOase is a **PHP/Symfony-based IServ module** for booking school sports faci
 
 ## Recent Changes
 
-**November 23, 2025 - Production Optimization**:
+**November 23, 2025 - Production Optimization & Branding**:
 - ✅ **Module schlank gemacht**: Test-Umgebung und 10+ Dev-Docs entfernt
 - ✅ **Dokumentation konsolidiert**: INSTALLATION.md mit kompletter Deployment-Anleitung
 - ✅ **README vereinfacht**: Nur Überblick, kein Development-Kram
 - ✅ **.gitignore optimiert**: Production-ready für IServ-Deployment
 - ✅ **Architect-Review**: Bestätigt als production-ready, keine fehlenden Dateien
+- ✅ **SportOase Logo integriert**: Offizielles Logo als PWA-Icon und Projekt-Icon
+- ✅ **GoogleCalendarService optimiert**: Zeitperioden werden zentral vom ConfigService bezogen (keine Duplikation mehr)
 
 **November 22, 2025 - IServ Module Implementation**: 
 - Complete conversion from Flask/Python to PHP/Symfony IServ module structure

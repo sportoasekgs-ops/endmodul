@@ -5,7 +5,7 @@
   "start_url": "/sportoase",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4A90E2",
+  "theme_color": "#5DADE2",
   "orientation": "portrait-primary",
   "icons": [
     {
