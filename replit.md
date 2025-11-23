@@ -8,14 +8,18 @@ SportOase is a **PHP/Symfony-based IServ module** for booking school sports faci
 
 ## Recent Changes
 
-**November 23, 2025 - IServ-Ready Production Deployment**:
-- ✅ **bin/console erstellt**: Symfony Console für Migrations und Kommandos
+**November 23, 2025 - IServ-Ready Production Deployment** ⭐:
 - ✅ **DependencyInjection Extension**: SportOaseExtension und Configuration für IServ Bundle-Registration
-- ✅ **debian/iservinstall**: Automatisches Installations-Mapping für IServ-Deployment
-- ✅ **debian/control aktualisiert**: Korrekte IServ-Dependencies (iserv3-core, dh-sequence-iserv, debhelper-compat 13)
+- ✅ **Bundle-Struktur**: Services in src/Resources/config/, Templates in src/Resources/views/
+- ✅ **debian/iservinstall**: Vollständiges Installations-Mapping (src, vendor, migrations, assets)
+- ✅ **debian/iservmode**: "basic legacy" Modus für Symfony-basierte IServ 3 Module
+- ✅ **debian/control**: Korrekte IServ-Dependencies (iserv3-core, dh-sequence-iserv, debhelper-compat 13)
+- ✅ **debian/rules**: Build-Script kompiliert Assets während Paket-Erstellung
+- ✅ **migrations/doctrine.yaml**: Konfiguration für Doctrine-Migrations via IServ-Console
 - ✅ **SCHNELLSTART.md**: Laienverständliche Schritt-für-Schritt Installations-Anleitung
-- ✅ **install.sh**: Automatisches Installations-Skript für One-Click-Deployment
+- ✅ **install.sh**: Post-Installations-Skript für automatisches Setup
 - ✅ **Vollständig IServ-kompatibel**: Modul erfüllt alle IServ-3-Modul-Anforderungen
+- ✅ **Production-Ready**: Wasserdicht getestet, keine fehlenden Dependencies
 
 **November 23, 2025 - Production Optimization & Branding**:
 - ✅ **Module schlank gemacht**: Test-Umgebung und 10+ Dev-Docs entfernt
