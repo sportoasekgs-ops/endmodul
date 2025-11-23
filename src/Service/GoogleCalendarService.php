@@ -12,8 +12,9 @@ class GoogleCalendarService
     private ?GoogleCalendar $calendarService = null;
     private bool $enabled = false;
 
-    public function __construct()
-    {
+    public function __construct(
+        private ConfigService $configService
+    ) {
         if ($this->hasCredentials()) {
             try {
                 $client = new GoogleClient();
@@ -120,16 +121,10 @@ class GoogleCalendarService
 
     private function getBookingStartTime(Booking $booking): \DateTime
     {
-        $periodTimes = [
-            1 => '07:50',
-            2 => '08:35',
-            3 => '09:40',
-            4 => '10:30',
-            5 => '11:20',
-            6 => '12:10',
-        ];
+        $periods = $this->configService->getPeriods();
+        $period = $periods[$booking->getPeriod()] ?? null;
         
-        $time = $periodTimes[$booking->getPeriod()] ?? '08:00';
+        $time = $period['start'] ?? '08:00';
         $dateTime = clone $booking->getDate();
         $dateTime->setTime(
             (int) substr($time, 0, 2),
@@ -141,16 +136,10 @@ class GoogleCalendarService
 
     private function getBookingEndTime(Booking $booking): \DateTime
     {
-        $periodTimes = [
-            1 => '08:35',
-            2 => '09:20',
-            3 => '10:25',
-            4 => '11:15',
-            5 => '12:05',
-            6 => '12:55',
-        ];
+        $periods = $this->configService->getPeriods();
+        $period = $periods[$booking->getPeriod()] ?? null;
         
-        $time = $periodTimes[$booking->getPeriod()] ?? '09:00';
+        $time = $period['end'] ?? '09:00';
         $dateTime = clone $booking->getDate();
         $dateTime->setTime(
             (int) substr($time, 0, 2),
